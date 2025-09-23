@@ -1,0 +1,127 @@
+#include "WindowProcs.h"
+#include "UIConstants.h"
+#include "ModernUI.h"
+#include "ChatModels.h"
+#include "UIManager.h"
+
+// External declarations for UI window handles
+extern HWND hSendButton;
+extern HWND hShareFileButton;
+extern HWND hContactsList;
+
+// Window procedure storage for subclassing
+WNDPROC originalButtonProc = nullptr;
+WNDPROC originalListBoxProc = nullptr;
+
+void SetupCustomWindowProcs()
+{
+    // Subclass buttons for custom drawing
+    originalButtonProc = (WNDPROC)SetWindowLongPtr(hSendButton, GWLP_WNDPROC, (LONG_PTR)ModernButtonProc);
+    SetWindowLongPtr(hShareFileButton, GWLP_WNDPROC, (LONG_PTR)ModernButtonProc);
+    
+    // Subclass contact list for custom drawing
+    originalListBoxProc = (WNDPROC)SetWindowLongPtr(hContactsList, GWLP_WNDPROC, (LONG_PTR)ModernListBoxProc);
+}
+
+// Modern button subclass procedure
+LRESULT CALLBACK ModernButtonProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    static bool isHovered = false;
+    static bool isPressed = false;
+    
+    switch (msg)
+    {
+    case WM_PAINT:
+        {
+            PAINTSTRUCT ps;
+            HDC hdc = BeginPaint(hWnd, &ps);
+            
+            RECT rect;
+            GetClientRect(hWnd, &rect);
+            
+            WCHAR text[256];
+            GetWindowText(hWnd, text, 256);
+            
+            DrawModernButton(hdc, rect, std::wstring(text), isHovered, isPressed);
+            
+            EndPaint(hWnd, &ps);
+            return 0;
+        }
+        
+    case WM_MOUSEMOVE:
+        if (!isHovered)
+        {
+            isHovered = true;
+            InvalidateRect(hWnd, NULL, FALSE);
+            
+            TRACKMOUSEEVENT tme = {};
+            tme.cbSize = sizeof(tme);
+            tme.dwFlags = TME_LEAVE;
+            tme.hwndTrack = hWnd;
+            TrackMouseEvent(&tme);
+        }
+        break;
+        
+    case WM_MOUSELEAVE:
+        isHovered = false;
+        InvalidateRect(hWnd, NULL, FALSE);
+        break;
+        
+    case WM_LBUTTONDOWN:
+        isPressed = true;
+        InvalidateRect(hWnd, NULL, FALSE);
+        SetCapture(hWnd);
+        break;
+        
+    case WM_LBUTTONUP:
+        if (isPressed)
+        {
+            isPressed = false;
+            InvalidateRect(hWnd, NULL, FALSE);
+            ReleaseCapture();
+            
+            // Send click notification to parent
+            HWND hParent = GetParent(hWnd);
+            int controlId = GetDlgCtrlID(hWnd);
+            ::SendMessage(hParent, WM_COMMAND, MAKEWPARAM(controlId, BN_CLICKED), (LPARAM)hWnd);
+        }
+        break;
+    }
+    
+    return CallWindowProc(originalButtonProc, hWnd, msg, wParam, lParam);
+}
+
+// Modern listbox subclass procedure  
+LRESULT CALLBACK ModernListBoxProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    switch (msg)
+    {
+    case WM_PAINT:
+        if (hWnd == hContactsList)
+        {
+            PAINTSTRUCT ps;
+            HDC hdc = BeginPaint(hWnd, &ps);
+            
+            RECT clientRect;
+            GetClientRect(hWnd, &clientRect);
+            
+            // Fill background
+            FillRect(hdc, &clientRect, hBrushSurface);
+            
+            int itemCount = contacts.size();
+            int selectedIndex = ::SendMessage(hWnd, LB_GETCURSEL, 0, 0);
+            
+            for (int i = 0; i < itemCount; i++)
+            {
+                RECT itemRect = {0, i * CONTACT_ITEM_HEIGHT, clientRect.right, (i + 1) * CONTACT_ITEM_HEIGHT};
+                DrawContactItem(hdc, itemRect, contacts[i], i == selectedIndex);
+            }
+            
+            EndPaint(hWnd, &ps);
+            return 0;
+        }
+        break;
+    }
+    
+    return CallWindowProc(originalListBoxProc, hWnd, msg, wParam, lParam);
+}

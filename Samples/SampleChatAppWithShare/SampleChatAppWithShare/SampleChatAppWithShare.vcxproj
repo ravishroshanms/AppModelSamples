@@ -176,13 +176,26 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="ChatManager.h" />
+    <ClInclude Include="ChatModels.h" />
+    <ClInclude Include="FileManager.h" />
     <ClInclude Include="framework.h" />
+    <ClInclude Include="ModernUI.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="SampleChatAppWithShare.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="UIConstants.h" />
+    <ClInclude Include="UIManager.h" />
+    <ClInclude Include="WindowProcs.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="ChatManager.cpp" />
+    <ClCompile Include="ChatModels.cpp" />
+    <ClCompile Include="FileManager.cpp" />
+    <ClCompile Include="ModernUI.cpp" />
     <ClCompile Include="SampleChatAppWithShare.cpp" />
+    <ClCompile Include="UIManager.cpp" />
+    <ClCompile Include="WindowProcs.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="SampleChatAppWithShare.rc" />
@@ -190,6 +203,9 @@
   <ItemGroup>
     <Image Include="SampleChatAppWithShare.ico" />
     <Image Include="small.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <Manifest Include="SampleChatAppWithShare.exe.manifest" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
