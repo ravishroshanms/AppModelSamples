@@ -108,13 +108,27 @@ LRESULT CALLBACK ModernListBoxProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lP
             // Fill background
             FillRect(hdc, &clientRect, hBrushSurface);
             
-            int itemCount = contacts.size();
-            int selectedIndex = ::SendMessage(hWnd, LB_GETCURSEL, 0, 0);
+            int itemCount = (int)contacts.size();
+            int selectedIndex = (int)::SendMessage(hWnd, LB_GETCURSEL, 0, 0);
             
-            for (int i = 0; i < itemCount; i++)
+            // Get the first visible item index to handle scrolling correctly
+            int topIndex = (int)::SendMessage(hWnd, LB_GETTOPINDEX, 0, 0);
+            
+            // Calculate how many items can be visible
+            int visibleItemCount = (clientRect.bottom / CONTACT_ITEM_HEIGHT) + 1;
+            
+            // Draw only the visible items
+            for (int visiblePos = 0; visiblePos < visibleItemCount; visiblePos++)
             {
-                RECT itemRect = {0, i * CONTACT_ITEM_HEIGHT, clientRect.right, (i + 1) * CONTACT_ITEM_HEIGHT};
-                DrawContactItem(hdc, itemRect, contacts[i], i == selectedIndex);
+                int actualIndex = topIndex + visiblePos;
+                
+                // Stop if we've reached the end of the contact list
+                if (actualIndex >= itemCount) break;
+                
+                RECT itemRect = {0, visiblePos * CONTACT_ITEM_HEIGHT, clientRect.right, (visiblePos + 1) * CONTACT_ITEM_HEIGHT};
+                
+                // Draw the contact that should be visible at this position
+                DrawContactItem(hdc, itemRect, contacts[actualIndex], actualIndex == selectedIndex);
             }
             
             EndPaint(hWnd, &ps);

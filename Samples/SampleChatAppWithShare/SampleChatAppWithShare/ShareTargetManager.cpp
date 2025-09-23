@@ -1,5 +1,9 @@
 #include "ShareTargetManager.h"
 #include "PackageIdentity.h"
+#include "ContactSelectionDialog.h"
+#include "ChatManager.h"
+#include "ChatModels.h"
+#include "FileManager.h"
 #include "framework.h"
 #include <sstream>
 
@@ -81,13 +85,26 @@ bool ShareTargetManager::ProcessActivationArgs()
         {
             LogShareInfo(L"? Share Target activation detected!");
             
-            // Process the share target directly here (same as original code)
+            // Ensure contacts are initialized (critical for share target scenarios)
+            if (contacts.empty())
+            {
+                LogShareInfo(L"Initializing contacts for share target scenario...");
+                InitializeContacts();
+            }
+            
+            // Process the share target directly here
             auto shareArgs = activationArgs.as<winrt::Windows::ApplicationModel::Activation::IShareTargetActivatedEventArgs>();
             auto shareOperation = shareArgs.ShareOperation();
             auto data = shareOperation.Data();
 
-            std::wstring shareInfo = L"Share Target Activated!\n\n";
-
+            // Extract shared content information for the contact selection dialog
+            std::wstring sharedContentSummary = L"Shared Content";
+            std::wstring sharedFiles;
+            bool hasFiles = false;
+            
+            // Collect information about what's being shared
+            std::vector<std::wstring> sharedItems;
+            
             // Check for different data formats
             if (data.Contains(winrt::Windows::ApplicationModel::DataTransfer::StandardDataFormats::Text()))
             {
@@ -95,12 +112,12 @@ bool ShareTargetManager::ProcessActivationArgs()
                 {
                     auto textAsync = data.GetTextAsync();
                     auto text = textAsync.get();
-                    shareInfo += L"?? Text: " + std::wstring(text.c_str()) + L"\n\n";
+                    sharedItems.push_back(L"Text: " + std::wstring(text.c_str()));
                     LogShareInfo(L"Received shared text.");
                 }
                 catch (...)
                 {
-                    shareInfo += L"?? Text: [Error retrieving text]\n\n";
+                    sharedItems.push_back(L"Text: [Error retrieving text]");
                     LogShareError(L"Error retrieving shared text.");
                 }
             }
@@ -111,12 +128,12 @@ bool ShareTargetManager::ProcessActivationArgs()
                 {
                     auto webLinkAsync = data.GetWebLinkAsync();
                     auto webLink = webLinkAsync.get();
-                    shareInfo += L"?? Web Link: " + std::wstring(webLink.ToString().c_str()) + L"\n\n";
+                    sharedItems.push_back(L"Web Link: " + std::wstring(webLink.ToString().c_str()));
                     LogShareInfo(L"Received shared web link.");
                 }
                 catch (...)
                 {
-                    shareInfo += L"?? Web Link: [Error retrieving web link]\n\n";
+                    sharedItems.push_back(L"Web Link: [Error retrieving web link]");
                     LogShareError(L"Error retrieving shared web link.");
                 }
             }
@@ -127,12 +144,12 @@ bool ShareTargetManager::ProcessActivationArgs()
                 {
                     auto bitmapAsync = data.GetBitmapAsync();
                     auto bitmapRef = bitmapAsync.get();
-                    shareInfo += L"??? Bitmap: Received image content\n\n";
+                    sharedItems.push_back(L"Image/Bitmap content");
                     LogShareInfo(L"Received shared bitmap.");
                 }
                 catch (...)
                 {
-                    shareInfo += L"??? Bitmap: [Error retrieving bitmap]\n\n";
+                    sharedItems.push_back(L"Image: [Error retrieving image]");
                     LogShareError(L"Error retrieving shared bitmap.");
                 }
             }
@@ -143,27 +160,134 @@ bool ShareTargetManager::ProcessActivationArgs()
                 {
                     auto storageItemsAsync = data.GetStorageItemsAsync();
                     auto storageItems = storageItemsAsync.get();
-                    shareInfo += L"?? Files: " + std::to_wstring(storageItems.Size()) + L" file(s) shared\n";
+                    
+                    hasFiles = true;
+                    std::wstring filesInfo = std::to_wstring(storageItems.Size()) + L" file(s)";
+                    
+                    if (storageItems.Size() == 1)
+                    {
+                        auto item = storageItems.GetAt(0);
+                        sharedFiles = item.Name().c_str();
+                        sharedContentSummary = sharedFiles;
+                    }
+                    else if (storageItems.Size() > 1)
+                    {
+                        sharedFiles = L"Multiple Files (" + std::to_wstring(storageItems.Size()) + L")";
+                        sharedContentSummary = sharedFiles;
+                    }
                     
                     for (uint32_t i = 0; i < storageItems.Size(); i++)
                     {
                         auto item = storageItems.GetAt(i);
-                        shareInfo += L"  - " + std::wstring(item.Name().c_str()) + L"\n";
+                        filesInfo += L"\n  - " + std::wstring(item.Name().c_str());
                     }
-                    shareInfo += L"\n";
+                    
+                    sharedItems.push_back(filesInfo);
                     LogShareInfo(L"Received shared files.");
                 }
                 catch (...)
                 {
-                    shareInfo += L"?? Files: [Error retrieving files]\n\n";
+                    sharedItems.push_back(L"Files: [Error retrieving files]");
                     LogShareError(L"Error retrieving shared files.");
                 }
             }
 
-            // Show the share information
-            MessageBoxW(nullptr, shareInfo.c_str(), L"Windows Share Target", MB_OK | MB_ICONINFORMATION);
+            // If no specific content type found, use generic description
+            if (sharedItems.empty())
+            {
+                sharedContentSummary = L"Shared Content";
+                sharedItems.push_back(L"Unknown content type");
+            }
 
-            // Report completion
+            // Get the main window handle for dialog parent
+            HWND hMainWindow = GetActiveWindow();
+            if (!hMainWindow)
+            {
+                hMainWindow = GetForegroundWindow();
+            }
+            if (!hMainWindow)
+            {
+                // Try to find the main chat application window
+                hMainWindow = FindWindow(NULL, L"Chat Application");
+            }
+
+            // Log the number of contacts available for debugging
+            LogShareInfo(L"Available contacts: " + std::to_wstring(contacts.size()));
+
+            // Show contact selection dialog for the shared content
+            ContactSelectionDialog::SelectionResult result = 
+                ContactSelectionDialog::ShowContactSelectionDialog(hMainWindow, L"", sharedContentSummary);
+            
+            if (result.wasSelected)
+            {
+                // User selected a contact - add the shared content to that contact's chat
+                if (result.contactIndex >= 0 && result.contactIndex < (int)contacts.size())
+                {
+                    int previousSelection = selectedContactIndex;
+                    selectedContactIndex = result.contactIndex;
+                    
+                    // Add the custom share message if provided
+                    if (!result.shareMessage.empty())
+                    {
+                        AddMessageToChat(result.shareMessage, true);
+                    }
+                    
+                    // Add shared content messages to the chat
+                    for (const auto& item : sharedItems)
+                    {
+                        std::wstring shareMsg = L"?? Received via Share: " + item;
+                        AddMessageToChat(shareMsg, false); // Mark as incoming since it's from external source
+                    }
+                    
+                    // If files were shared, add them to the contact's shared files list
+                    if (hasFiles && data.Contains(winrt::Windows::ApplicationModel::DataTransfer::StandardDataFormats::StorageItems()))
+                    {
+                        try
+                        {
+                            auto storageItemsAsync = data.GetStorageItemsAsync();
+                            auto storageItems = storageItemsAsync.get();
+                            
+                            for (uint32_t i = 0; i < storageItems.Size(); i++)
+                            {
+                                auto item = storageItems.GetAt(i);
+                                
+                                // Create shared file entry
+                                SharedFile newFile;
+                                newFile.fileName = item.Name().c_str();
+                                newFile.filePath = item.Path().c_str(); // Get full path if available
+                                newFile.sharedBy = L"External Share";
+                                GetSystemTime(&newFile.timeShared);
+                                
+                                contacts[result.contactIndex].sharedFiles.push_back(newFile);
+                            }
+                            
+                            // Update shared files UI
+                            UpdateSharedFilesList();
+                        }
+                        catch (...)
+                        {
+                            LogShareError(L"Error adding shared files to contact.");
+                        }
+                    }
+                    
+                    // Update UI to show the chat with the selected contact
+                    LoadContactChat(result.contactIndex);
+                    
+                    // Show success message
+                    std::wstring successMsg = L"Shared content has been added to your conversation with " + contacts[result.contactIndex].name + L"!";
+                    MessageBoxW(hMainWindow, successMsg.c_str(), L"Content Shared Successfully", MB_OK | MB_ICONINFORMATION);
+                    
+                    LogShareInfo(L"Share target content added to contact: " + contacts[result.contactIndex].name);
+                }
+            }
+            else
+            {
+                // User cancelled - show a brief message
+                MessageBoxW(hMainWindow, L"Share operation was cancelled.", L"Share Cancelled", MB_OK | MB_ICONINFORMATION);
+                LogShareInfo(L"Share target operation cancelled by user.");
+            }
+
+            // Report completion to Windows
             shareOperation.ReportCompleted();
             
             LogShareInfo(L"Share target processing completed successfully.");

@@ -184,6 +184,7 @@
   <ItemGroup>
     <ClInclude Include="ChatManager.h" />
     <ClInclude Include="ChatModels.h" />
+    <ClInclude Include="ContactSelectionDialog.h" />
     <ClInclude Include="FileManager.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="ModernUI.h" />
@@ -199,6 +200,7 @@
   <ItemGroup>
     <ClCompile Include="ChatManager.cpp" />
     <ClCompile Include="ChatModels.cpp" />
+    <ClCompile Include="ContactSelectionDialog.cpp" />
     <ClCompile Include="FileManager.cpp" />
     <ClCompile Include="ModernUI.cpp" />
     <ClCompile Include="PackageIdentity.cpp" />
@@ -216,6 +218,12 @@
   </ItemGroup>
   <ItemGroup>
     <Manifest Include="SampleChatAppWithShare.exe.manifest" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ContactList_ScrollingFix_Complete.md" />
+    <None Include="ContactSelection_PopulationFix_Complete.md" />
+    <None Include="FilePicker_ContactDialog_Removal_Complete.md" />
+    <None Include="ShareTarget_ContactSelection_Complete.md" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
