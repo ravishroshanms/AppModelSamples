@@ -48,6 +48,9 @@
     <ClInclude Include="WindowProcs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="PackageIdentity.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SampleChatAppWithShare.cpp">
@@ -69,6 +72,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="WindowProcs.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PackageIdentity.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

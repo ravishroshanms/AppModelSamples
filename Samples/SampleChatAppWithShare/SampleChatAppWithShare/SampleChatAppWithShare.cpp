@@ -9,6 +9,7 @@
 #include "ChatManager.h"
 #include "FileManager.h"
 #include "UIManager.h"
+#include "PackageIdentity.h"
 #include "WindowProcs.h"
 #include <commctrl.h>
 #include <shellapi.h>
@@ -37,6 +38,44 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 {
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
+
+    // Init package identity checks
+    InitializePackageIdentity();
+
+    if (g_isSparsePackageSupported && !g_isRunningWithIdentity)
+    {
+        std::wstring executableDir = GetExecutableDirectory();
+        std::wstring packagePath = executableDir + L"\\Weixin_1.0.1.0_x86__v4k3sbdawh17a.msix";
+        
+        // Validate the MSIX package before attempting registration
+        if (ValidateMsixPackage(packagePath))
+        {
+            HRESULT result = RegisterPackageWithExternalLocation(executableDir, packagePath);
+            if (SUCCEEDED(result))
+            {
+                OutputDebugStringW(L"ChatApp: Package registration succeeded. Relaunching...\n");
+                RelaunchApplication();
+                return 0; // Exit after relaunch
+            }
+            else
+            {
+                // Log the error but continue without package identity
+                wchar_t errorLog[256];
+                swprintf_s(errorLog, L"ChatApp: Failed to register package. HRESULT: 0x%08X. Continuing without package identity.\n", result);
+                OutputDebugStringW(errorLog);
+            }
+        }
+        else
+        {
+            OutputDebugStringW(L"ChatApp: MSIX package validation failed. Continuing without package identity.\n");
+        }
+    }
+    else
+    {
+        // Log the current status
+        std::wstring status = GetPackageIdentityStatus();
+        OutputDebugStringW(status.c_str());
+    }
 
     // Initialize COM for shell operations
     CoInitialize(NULL);
