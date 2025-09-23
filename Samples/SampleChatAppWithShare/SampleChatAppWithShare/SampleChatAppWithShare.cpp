@@ -10,15 +10,28 @@
 #include "FileManager.h"
 #include "UIManager.h"
 #include "PackageIdentity.h"
+#include "ShareTargetManager.h"
 #include "WindowProcs.h"
 #include <commctrl.h>
 #include <shellapi.h>
 #include <objbase.h>
+#include <winrt/base.h>
+#include <sstream>
 
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "uxtheme.lib")
 #pragma comment(lib, "ole32.lib")
+// Add WinRT libraries to fix linking error
+#pragma comment(lib, "windowsapp.lib")
+#pragma comment(lib, "runtimeobject.lib")
+
+using namespace winrt;
+using namespace Windows::Foundation;
+using namespace Windows::ApplicationModel;
+using namespace Windows::ApplicationModel::Activation;
+using namespace Windows::ApplicationModel::DataTransfer;
+using namespace Windows::ApplicationModel::DataTransfer::ShareTarget;
 
 // Global Variables:
 HINSTANCE hInst;                                // current instance
@@ -41,6 +54,26 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     // Init package identity checks
     InitializePackageIdentity();
+
+    // Initialize WinRT with proper error handling
+    try
+    {
+        winrt::init_apartment();
+        OutputDebugStringW(L"ChatApp: WinRT initialized successfully.\n");
+    }
+    catch (hresult_error const& ex)
+    {
+        std::wstring errorMsg = L"ChatApp: WinRT initialization failed: " + std::wstring(ex.message().c_str()) + 
+                               L" (HRESULT: 0x" + std::to_wstring(static_cast<uint32_t>(ex.code())) + L")\n";
+        OutputDebugStringW(errorMsg.c_str());
+    }
+    catch (...)
+    {
+        OutputDebugStringW(L"ChatApp: WinRT initialization failed with unknown error.\n");
+    }
+
+    // Initialize Share Target Manager
+    ShareTargetManager::Initialize();
 
     if (g_isSparsePackageSupported && !g_isRunningWithIdentity)
     {
@@ -69,6 +102,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         {
             OutputDebugStringW(L"ChatApp: MSIX package validation failed. Continuing without package identity.\n");
         }
+    }
+    else if (g_isRunningWithIdentity)
+    {
+        // Process share target activation using the ShareTargetManager
+        ShareTargetManager::ProcessActivationArgs();
     }
     else
     {
@@ -273,6 +311,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                     InvalidateRect(hSendButton, NULL, FALSE);
                 }
                 break;
+            case 2000: // Test WinRT Share Target Status
+                {
+                    // Use ShareTargetManager to get status
+                    std::wstring statusInfo = ShareTargetManager::GetShareTargetStatus();
+                    MessageBoxW(hWnd, statusInfo.c_str(), L"WinRT Share Target Status", MB_OK | MB_ICONINFORMATION);
+                }
+                break;
             default:
                 return DefWindowProc(hWnd, message, wParam, lParam);
             }
@@ -313,7 +358,50 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
     switch (message)
     {
     case WM_INITDIALOG:
-        return (INT_PTR)TRUE;
+        {
+            // Add WinRT and package identity information to the about dialog
+            std::wstring aboutText = L"Chat Application with WinRT Share Target Support\n\n";
+            
+            // Test WinRT status
+            try
+            {
+                winrt::check_hresult(S_OK);
+                aboutText += L"?? WinRT Status: ? Initialized and Working\n";
+                
+                if (g_isRunningWithIdentity)
+                {
+                    if (ShareTargetManager::IsShareTargetActivation())
+                    {
+                        aboutText += L"?? Share Target: ? Currently Activated via Windows Share Sheet\n";
+                    }
+                    else
+                    {
+                        aboutText += L"?? Share Target: ? Ready for Activation\n";
+                    }
+                }
+                else
+                {
+                    aboutText += L"?? Share Target: ? Package Identity Required\n";
+                }
+            }
+            catch (...)
+            {
+                aboutText += L"?? WinRT Status: ? Error or Not Available\n";
+            }
+            
+            aboutText += L"?? Package Identity: " + std::wstring(g_isRunningWithIdentity ? L"? Available" : L"? Not Available") + L"\n";
+            aboutText += L"?? Sparse Package Support: " + std::wstring(g_isSparsePackageSupported ? L"? Supported" : L"? Not Supported") + L"\n\n";
+            aboutText += L"Current Features:\n";
+            aboutText += L"? WinRT Runtime Integration\n";
+            aboutText += L"? Windows Share Target Support\n";
+            aboutText += L"? Package Identity Management\n";
+            aboutText += L"? MSIX Package Registration\n";
+            aboutText += L"? Modern Chat UI\n\n";
+            aboutText += GetPackageIdentityStatus();
+            
+            SetDlgItemTextW(hDlg, IDC_STATIC, aboutText.c_str());
+            return (INT_PTR)TRUE;
+        }
 
     case WM_COMMAND:
         if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)

@@ -190,6 +190,7 @@
     <ClInclude Include="PackageIdentity.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="SampleChatAppWithShare.h" />
+    <ClInclude Include="ShareTargetManager.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="UIConstants.h" />
     <ClInclude Include="UIManager.h" />
@@ -202,6 +203,7 @@
     <ClCompile Include="ModernUI.cpp" />
     <ClCompile Include="PackageIdentity.cpp" />
     <ClCompile Include="SampleChatAppWithShare.cpp" />
+    <ClCompile Include="ShareTargetManager.cpp" />
     <ClCompile Include="UIManager.cpp" />
     <ClCompile Include="WindowProcs.cpp" />
   </ItemGroup>
