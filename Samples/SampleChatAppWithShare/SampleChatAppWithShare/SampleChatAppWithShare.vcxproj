@@ -222,8 +222,11 @@
   <ItemGroup>
     <None Include="ContactList_ScrollingFix_Complete.md" />
     <None Include="ContactSelection_PopulationFix_Complete.md" />
+    <None Include="DuplicateContactDialog_Fix_Complete.md" />
     <None Include="FilePicker_ContactDialog_Removal_Complete.md" />
+    <None Include="ShareOnlyMode_Implementation_Complete.md" />
     <None Include="ShareTarget_ContactSelection_Complete.md" />
+    <None Include="ShareTarget_MessageFix_Complete.md" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

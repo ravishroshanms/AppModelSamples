@@ -78,12 +78,20 @@ bool ShareTargetManager::ProcessActivationArgs()
     if (!IsShareTargetAvailable())
         return false;
     
+    // Add a static flag to prevent multiple processing
+    static bool s_alreadyProcessed = false;
+    if (s_alreadyProcessed) {
+        LogShareInfo(L"Share target already processed - skipping duplicate call");
+        return false;
+    }
+    
     try
     {
         auto activationArgs = winrt::Windows::ApplicationModel::AppInstance::GetActivatedEventArgs();
         if (activationArgs && activationArgs.Kind() == winrt::Windows::ApplicationModel::Activation::ActivationKind::ShareTarget)
         {
             LogShareInfo(L"? Share Target activation detected!");
+            s_alreadyProcessed = true; // Mark as processed
             
             // Ensure contacts are initialized (critical for share target scenarios)
             if (contacts.empty())
@@ -226,17 +234,34 @@ bool ShareTargetManager::ProcessActivationArgs()
                     int previousSelection = selectedContactIndex;
                     selectedContactIndex = result.contactIndex;
                     
+                    LogShareInfo(L"Setting selectedContactIndex to: " + std::to_wstring(result.contactIndex));
+                    LogShareInfo(L"Selected contact name: " + contacts[result.contactIndex].name);
+                    
+                    // Add messages directly to the selected contact instead of relying on selectedContactIndex
+                    Contact& selectedContact = contacts[result.contactIndex];
+                    
                     // Add the custom share message if provided
                     if (!result.shareMessage.empty())
                     {
-                        AddMessageToChat(result.shareMessage, true);
+                        std::wstring formattedShareMessage = L"You: " + result.shareMessage + L" ??";
+                        selectedContact.messages.push_back(formattedShareMessage);
+                        LogShareInfo(L"Added share message: " + result.shareMessage);
                     }
                     
                     // Add shared content messages to the chat
                     for (const auto& item : sharedItems)
                     {
                         std::wstring shareMsg = L"?? Received via Share: " + item;
-                        AddMessageToChat(shareMsg, false); // Mark as incoming since it's from external source
+                        std::wstring formattedMessage = selectedContact.name + L": " + shareMsg;
+                        selectedContact.messages.push_back(formattedMessage);
+                        LogShareInfo(L"Added shared content message: " + shareMsg);
+                    }
+                    
+                    // Update the last message preview for this contact
+                    if (!sharedItems.empty())
+                    {
+                        std::wstring lastMsg = L"?? Received via Share: " + sharedItems[0];
+                        selectedContact.lastMessage = lastMsg.length() > 50 ? lastMsg.substr(0, 47) + L"..." : lastMsg;
                     }
                     
                     // If files were shared, add them to the contact's shared files list
@@ -258,11 +283,9 @@ bool ShareTargetManager::ProcessActivationArgs()
                                 newFile.sharedBy = L"External Share";
                                 GetSystemTime(&newFile.timeShared);
                                 
-                                contacts[result.contactIndex].sharedFiles.push_back(newFile);
+                                selectedContact.sharedFiles.push_back(newFile);
+                                LogShareInfo(L"Added shared file: " + newFile.fileName);
                             }
-                            
-                            // Update shared files UI
-                            UpdateSharedFilesList();
                         }
                         catch (...)
                         {
@@ -270,21 +293,38 @@ bool ShareTargetManager::ProcessActivationArgs()
                         }
                     }
                     
-                    // Update UI to show the chat with the selected contact
-                    LoadContactChat(result.contactIndex);
-                    
-                    // Show success message
-                    std::wstring successMsg = L"Shared content has been added to your conversation with " + contacts[result.contactIndex].name + L"!";
-                    MessageBoxW(hMainWindow, successMsg.c_str(), L"Content Shared Successfully", MB_OK | MB_ICONINFORMATION);
+                    // Show success message and exit the application
+                    std::wstring successMsg = L"Content has been shared successfully with " + contacts[result.contactIndex].name + L"!\n\nThe application will now close.";
+                    MessageBoxW(hMainWindow, successMsg.c_str(), L"Sharing Complete", MB_OK | MB_ICONINFORMATION);
                     
                     LogShareInfo(L"Share target content added to contact: " + contacts[result.contactIndex].name);
+                    LogShareInfo(L"Selected contact index set to: " + std::to_wstring(result.contactIndex));
+                    LogShareInfo(L"Contact now has " + std::to_wstring(selectedContact.messages.size()) + L" messages");
+                    
+                    // Report completion to Windows
+                    shareOperation.ReportCompleted();
+                    
+                    LogShareInfo(L"Share target processing completed successfully. Exiting application.");
+                    
+                    // Exit the application after successful sharing
+                    PostQuitMessage(0);
+                    return true;
                 }
             }
             else
             {
-                // User cancelled - show a brief message
-                MessageBoxW(hMainWindow, L"Share operation was cancelled.", L"Share Cancelled", MB_OK | MB_ICONINFORMATION);
+                // User cancelled - show a brief message and exit
+                MessageBoxW(hMainWindow, L"Share operation was cancelled.\n\nThe application will now close.", L"Share Cancelled", MB_OK | MB_ICONINFORMATION);
                 LogShareInfo(L"Share target operation cancelled by user.");
+                
+                // Report completion to Windows
+                shareOperation.ReportCompleted();
+                
+                LogShareInfo(L"Share target processing cancelled. Exiting application.");
+                
+                // Exit the application after cancellation
+                PostQuitMessage(0);
+                return true;
             }
 
             // Report completion to Windows
@@ -301,6 +341,7 @@ bool ShareTargetManager::ProcessActivationArgs()
     }
     catch (winrt::hresult_error const& ex)
     {
+        s_alreadyProcessed = true; // Mark as processed even on error to prevent retries
         std::wstring error = L"Error checking activation args: " + std::wstring(ex.message().c_str()) +
                            L" (HRESULT: 0x" + std::to_wstring(static_cast<uint32_t>(ex.code())) + L")";
         LogShareError(error);
@@ -309,6 +350,7 @@ bool ShareTargetManager::ProcessActivationArgs()
     }
     catch (...)
     {
+        s_alreadyProcessed = true; // Mark as processed even on error to prevent retries
         LogShareError(L"Unknown error checking activation arguments.");
         MessageBoxW(nullptr, L"Unknown error processing shared content", L"Share Target Error", MB_OK | MB_ICONERROR);
         return false;

@@ -96,6 +96,33 @@ LRESULT CALLBACK ModernListBoxProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lP
 {
     switch (msg)
     {
+    case WM_LBUTTONDOWN:
+        if (hWnd == hContactsList)
+        {
+            // Handle mouse click to ensure proper contact selection with scrolling
+            POINT pt = { LOWORD(lParam), HIWORD(lParam) };
+            
+            // Calculate which contact was clicked based on the scroll position
+            int topIndex = (int)::SendMessage(hWnd, LB_GETTOPINDEX, 0, 0);
+            int clickedVisiblePos = pt.y / CONTACT_ITEM_HEIGHT;
+            int actualContactIndex = topIndex + clickedVisiblePos;
+            
+            // Ensure the clicked contact is valid
+            if (actualContactIndex >= 0 && actualContactIndex < (int)contacts.size())
+            {
+                // Set the correct selection in the listbox
+                ::SendMessage(hWnd, LB_SETCURSEL, actualContactIndex, 0);
+                
+                // Trigger the selection change event to update the UI
+                HWND hParent = GetParent(hWnd);
+                int controlId = GetDlgCtrlID(hWnd);
+                ::SendMessage(hParent, WM_COMMAND, MAKEWPARAM(controlId, LBN_SELCHANGE), (LPARAM)hWnd);
+                
+                return 0; // We handled the click
+            }
+        }
+        break;
+        
     case WM_PAINT:
         if (hWnd == hContactsList)
         {

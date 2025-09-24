@@ -38,6 +38,9 @@ HINSTANCE hInst;                                // current instance
 WCHAR szTitle[MAX_LOADSTRING];                  // The title bar text
 WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 
+// Global flag to track if we're in share-only mode
+bool g_isShareOnlyMode = false;
+
 // Forward declarations of functions included in this code module:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
@@ -74,6 +77,16 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     // Initialize Share Target Manager
     ShareTargetManager::Initialize();
+
+    // Note: Don't process share target activation here - UI isn't created yet
+    // This will be handled after UI creation in WndProc WM_CREATE
+
+    // Check if this is a share target activation to determine if we need the main window
+    if (g_isRunningWithIdentity && ShareTargetManager::IsShareTargetActivation())
+    {
+        g_isShareOnlyMode = true;
+        OutputDebugStringW(L"ChatApp: Running in share-only mode - main window will not be created\n");
+    }
 
     if (g_isSparsePackageSupported && !g_isRunningWithIdentity)
     {
@@ -127,28 +140,51 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     // Initialize global strings
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
     LoadStringW(hInstance, IDC_SAMPLECHATAPPWITHSHARE, szWindowClass, MAX_LOADSTRING);
-    MyRegisterClass(hInstance);
-
-    // Initialize modern UI
-    InitializeModernUI();
-
-    // Initialize dummy contacts
-    InitializeContacts();
-
-    // Perform application initialization:
-    if (!InitInstance (hInstance, nCmdShow))
+    
+    if (!g_isShareOnlyMode)
     {
-        return FALSE;
+        // Only register window class if we're not in share-only mode
+        MyRegisterClass(hInstance);
+        
+        // Initialize modern UI
+        InitializeModernUI();
     }
 
-    HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_SAMPLECHATAPPWITHSHARE));
+    // Initialize dummy contacts (needed for share target)
+    InitializeContacts();
+
+    if (g_isShareOnlyMode)
+    {
+        // In share-only mode, process the share target directly without creating a window
+        OutputDebugStringW(L"ChatApp: Processing share target in share-only mode\n");
+        ShareTargetManager::ProcessActivationArgs();
+    }
+    else
+    {
+        // Normal mode: create and show the main window
+        if (!InitInstance(hInstance, nCmdShow))
+        {
+            return FALSE;
+        }
+    }
+
+    HACCEL hAccelTable = nullptr;
+    if (!g_isShareOnlyMode)
+    {
+        hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_SAMPLECHATAPPWITHSHARE));
+    }
 
     MSG msg;
 
     // Main message loop:
     while (GetMessage(&msg, nullptr, 0, 0))
     {
-        if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
+        if (!g_isShareOnlyMode && !TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
+        {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+        else if (g_isShareOnlyMode)
         {
             TranslateMessage(&msg);
             DispatchMessage(&msg);
@@ -224,6 +260,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
     case WM_CREATE:
         CreateChatUI(hWnd);
+        
+        // Process share target activation after UI is created
+        if (g_isRunningWithIdentity)
+        {
+            ShareTargetManager::ProcessActivationArgs();
+        }
         break;
         
     case WM_SIZE:
@@ -366,7 +408,7 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
             try
             {
                 winrt::check_hresult(S_OK);
-                aboutText += L"?? WinRT Status: ? Initialized and Working\n";
+                aboutText += L"? WinRT Status: ? Initialized and Working\n";
                 
                 if (g_isRunningWithIdentity)
                 {
