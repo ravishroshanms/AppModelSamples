@@ -28,9 +28,9 @@ A non-package native Windows desktop Win32 GUI application written in C++. It in
 5. Install your cert on the machine
 6. Create a Sparse Package by packaging the updated contents of PackageWithExternalLocationCppSample using [App Packager](https://docs.microsoft.com/en-us/windows/win32/appxpkg/make-appx-package--makeappx-exe-) (MakeAppx.exe) and specifying the **/nv** flag. For example: MakeAppx.exe  pack  /d  \<Path to directory with AppxManifest.xml>  /p  \<Output Path> mypackage.msix  /nv
 7. Sign the new Sparse Package. See [Signing an app package using SignTool](https://docs.microsoft.com/en-us/windows/win32/appxpkg/how-to-sign-a-package-using-signtool) or you can also use [Device Guard Signing](https://docs.microsoft.com/en-us/microsoft-store/device-guard-signing-portal).
-8. In the WinMain method (in WinMain.cpp) update the value of **externalLocation** to match the output location of your VS Build binaries and the value of **packagePath** to match the path to your signed Sparse Package (.msix). Note that these values cannot be relative paths and must be complete paths.
+8. In RegisterPackageWithExternalLocation() method (in PackageIdentity.cpp) update the value of **externalLocation** to match the output location of your VS Build binaries and the value of **packagePath** to match the path to your signed Sparse Package (.msix). Note that these values cannot be relative paths and must be complete paths.
 9. Build the app
-10. Copy the PhotoStoreDemoPkg\Assets folder and resources.pri file to the same location as your VS Build binaries
+10. Copy the PhotoStoreDemoPkg\Assets folder and resources.pri file to the same location as your VS Build binaries. You can replace Assets with your own images.
 11. Run the app
 
 ### Removing the package
