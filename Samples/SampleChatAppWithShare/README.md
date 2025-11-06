@@ -10,11 +10,13 @@ You can learn more about Signed Sparse Packages and Identity, Registration & Act
 2. Windows OS version 10.0.19000.0 +
 3. Microsoft Visual C++ Redistributables
 
-### PackageWithExternalLocationCppApp
+### SampleChatAppWithShare
 
 A non-package native Windows desktop Win32 GUI application written in C++. It installs a Signed Sparse Package and uses it to act as a Share Target.
 
-* Registration of a Signed Sparse Package and handling of Shared photos happens in WinMain.cpp.
+* Registration of a Signed Sparse Package happens in PackageIdentity.cpp.
+
+* Handling of Shared Data happens in ShareTargetManager.cpp.
 
 * Files to package and sign to create a Sparse Package for use with the app are located in the PackageWithExternalLocationCppSample directory inside PackageWithExternalLocation sample.
   
