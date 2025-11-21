@@ -207,16 +207,27 @@ bool ShareTargetManager::ProcessActivationArgs()
                 sharedItems.push_back(L"Unknown content type");
             }
 
-            // Get the main window handle for dialog parent
-            HWND hMainWindow = GetActiveWindow();
+            // Get the main window handle for dialog parent - try to find or launch SampleChatAppWithShare first
+            HWND hMainWindow = FindOrLaunchPackageApplication(L"SampleChatAppWithShare.exe");
             if (!hMainWindow)
             {
-                hMainWindow = GetForegroundWindow();
+                LogShareInfo(L"Package application not found/launched, using fallback window detection");
+                
+                // Fallback to original logic
+                hMainWindow = GetActiveWindow();
+                if (!hMainWindow)
+                {
+                    hMainWindow = GetForegroundWindow();
+                }
+                if (!hMainWindow)
+                {
+                    // Try to find the main chat application window
+                    hMainWindow = FindWindow(NULL, L"Chat Application");
+                }
             }
-            if (!hMainWindow)
+            else
             {
-                // Try to find the main chat application window
-                hMainWindow = FindWindow(NULL, L"Chat Application");
+                LogShareInfo(L"Successfully found/launched package application for dialog parenting");
             }
 
             // Log the number of contacts available for debugging
@@ -422,4 +433,337 @@ void ShareTargetManager::LogShareError(const std::wstring& error)
 {
     std::wstring logMessage = L"ChatApp: ShareTarget ERROR - " + error + L"\n";
     OutputDebugStringW(logMessage.c_str());
+}
+
+// Helper function to get all processes in the same package using proper Package Manager APIs
+std::vector<DWORD> ShareTargetManager::GetPackageProcesses()
+{
+    std::vector<DWORD> packageProcesses;
+    
+    if (!g_isRunningWithIdentity)
+    {
+        LogShareError(L"GetPackageProcesses called without package identity");
+        return packageProcesses;
+    }
+    
+    try
+    {
+        // Get the current package family name first
+        UINT32 currentPackageFamilyNameLength = 0;
+        LONG result = GetCurrentPackageFamilyName(&currentPackageFamilyNameLength, nullptr);
+        
+        if (result != ERROR_INSUFFICIENT_BUFFER)
+        {
+            LogShareError(L"Failed to get current package family name length: " + std::to_wstring(result));
+            return packageProcesses;
+        }
+        
+        std::wstring currentPackageFamilyName(currentPackageFamilyNameLength, L'\0');
+        result = GetCurrentPackageFamilyName(&currentPackageFamilyNameLength, currentPackageFamilyName.data());
+        
+        if (result != ERROR_SUCCESS)
+        {
+            LogShareError(L"Failed to get current package family name: " + std::to_wstring(result));
+            return packageProcesses;
+        }
+        
+        // Remove null terminator that GetCurrentPackageFamilyName includes in the length
+        if (!currentPackageFamilyName.empty() && currentPackageFamilyName.back() == L'\0')
+        {
+            currentPackageFamilyName.pop_back();
+        }
+        
+        LogShareInfo(L"Current package family name: " + currentPackageFamilyName);
+        
+        // Enumerate all processes and check their package family names
+        HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if (hSnapshot == INVALID_HANDLE_VALUE)
+        {
+            LogShareError(L"Failed to create process snapshot");
+            return packageProcesses;
+        }
+
+        PROCESSENTRY32W processEntry = {};
+        processEntry.dwSize = sizeof(PROCESSENTRY32W);
+
+        if (Process32FirstW(hSnapshot, &processEntry))
+        {
+            do
+            {
+                if (IsProcessInSamePackage(processEntry.th32ProcessID, currentPackageFamilyName))
+                {
+                    packageProcesses.push_back(processEntry.th32ProcessID);
+                    LogShareInfo(L"Found package process: " + std::wstring(processEntry.szExeFile) + 
+                               L" (PID: " + std::to_wstring(processEntry.th32ProcessID) + L")");
+                }
+            } while (Process32NextW(hSnapshot, &processEntry));
+        }
+
+        CloseHandle(hSnapshot);
+    }
+    catch (...)
+    {
+        LogShareError(L"Exception in GetPackageProcesses");
+    }
+
+    LogShareInfo(L"Found " + std::to_wstring(packageProcesses.size()) + L" processes in the same package");
+    return packageProcesses;
+}
+
+// Helper function to check if a process is in the same package using proper Package Manager APIs
+bool ShareTargetManager::IsProcessInSamePackage(DWORD processId)
+{
+    if (!g_isRunningWithIdentity)
+        return false;
+
+    // Get the current package family name first
+    UINT32 currentPackageFamilyNameLength = 0;
+    LONG result = GetCurrentPackageFamilyName(&currentPackageFamilyNameLength, nullptr);
+    if (result != ERROR_INSUFFICIENT_BUFFER)
+        return false;
+        
+    std::wstring currentPackageFamilyName(currentPackageFamilyNameLength, L'\0');
+    result = GetCurrentPackageFamilyName(&currentPackageFamilyNameLength, currentPackageFamilyName.data());
+    if (result != ERROR_SUCCESS)
+        return false;
+        
+    // Remove null terminator
+    if (!currentPackageFamilyName.empty() && currentPackageFamilyName.back() == L'\0')
+    {
+        currentPackageFamilyName.pop_back();
+    }
+
+    return IsProcessInSamePackage(processId, currentPackageFamilyName);
+}
+
+// Overloaded helper function to check if a process is in the same package
+bool ShareTargetManager::IsProcessInSamePackage(DWORD processId, const std::wstring& targetPackageFamilyName)
+{
+    if (!g_isRunningWithIdentity)
+        return false;
+
+    try
+    {
+        // Open the target process to get its package information
+        HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
+        if (hProcess == NULL)
+        {
+            // Process might not be accessible or may have exited
+            return false;
+        }
+
+        // Get the package family name for the target process
+        UINT32 packageFamilyNameLength = 0;
+        LONG result = GetPackageFamilyName(hProcess, &packageFamilyNameLength, nullptr);
+        
+        if (result == APPMODEL_ERROR_NO_PACKAGE)
+        {
+            // Process is not packaged
+            CloseHandle(hProcess);
+            return false;
+        }
+        
+        if (result != ERROR_INSUFFICIENT_BUFFER)
+        {
+            CloseHandle(hProcess);
+            return false;
+        }
+        
+        std::wstring processPackageFamilyName(packageFamilyNameLength, L'\0');
+        result = GetPackageFamilyName(hProcess, &packageFamilyNameLength, processPackageFamilyName.data());
+        
+        CloseHandle(hProcess);
+        
+        if (result != ERROR_SUCCESS)
+        {
+            return false;
+        }
+        
+        // Remove null terminator
+        if (!processPackageFamilyName.empty() && processPackageFamilyName.back() == L'\0')
+        {
+            processPackageFamilyName.pop_back();
+        }
+        
+        // Compare package family names
+        bool isSamePackage = (processPackageFamilyName == targetPackageFamilyName);
+        
+        if (isSamePackage)
+        {
+            LogShareInfo(L"Process " + std::to_wstring(processId) + L" is in the same package: " + processPackageFamilyName);
+        }
+        
+        return isSamePackage;
+    }
+    catch (...)
+    {
+        LogShareError(L"Exception in IsProcessInSamePackage for PID: " + std::to_wstring(processId));
+        return false;
+    }
+}
+
+// Helper function to find the main window of the package application
+HWND ShareTargetManager::FindPackageApplicationWindow(const std::wstring& windowTitle)
+{
+    LogShareInfo(L"Searching for window with title: " + windowTitle);
+    
+    // First try to find the window by title
+    HWND hWnd = FindWindowW(NULL, windowTitle.c_str());
+    if (hWnd)
+    {
+        // Verify it belongs to a process in our package
+        DWORD processId = 0;
+        GetWindowThreadProcessId(hWnd, &processId);
+        
+        if (IsProcessInSamePackage(processId))
+        {
+            LogShareInfo(L"Found package application window (PID: " + std::to_wstring(processId) + L")");
+            return hWnd;
+        }
+        else
+        {
+            LogShareInfo(L"Found window but not in same package");
+        }
+    }
+
+    // If not found by title, enumerate all windows and check each one
+    std::vector<DWORD> packageProcesses = GetPackageProcesses();
+    
+    for (DWORD processId : packageProcesses)
+    {
+        // Find the main window for this process
+        struct EnumData
+        {
+            DWORD processId;
+            HWND hWnd;
+        } enumData = { processId, NULL };
+
+        EnumWindows([](HWND hWnd, LPARAM lParam) -> BOOL
+        {
+            EnumData* pData = reinterpret_cast<EnumData*>(lParam);
+            DWORD windowProcessId = 0;
+            GetWindowThreadProcessId(hWnd, &windowProcessId);
+            
+            if (windowProcessId == pData->processId && IsWindowVisible(hWnd))
+            {
+                // Check if this is a main window (has no parent and is not a tool window)
+                HWND hParent = GetParent(hWnd);
+                LONG_PTR exStyle = GetWindowLongPtr(hWnd, GWL_EXSTYLE);
+                
+                if (!hParent && !(exStyle & WS_EX_TOOLWINDOW))
+                {
+                    pData->hWnd = hWnd;
+                    return FALSE; // Stop enumeration
+                }
+            }
+            return TRUE; // Continue enumeration
+        }, reinterpret_cast<LPARAM>(&enumData));
+
+        if (enumData.hWnd)
+        {
+            LogShareInfo(L"Found main window for package process (PID: " + std::to_wstring(processId) + L")");
+            return enumData.hWnd;
+        }
+    }
+
+    LogShareInfo(L"No package application window found");
+    return NULL;
+}
+
+// Helper function to launch the package application
+bool ShareTargetManager::LaunchPackageApplication(const std::wstring& appExecutableName)
+{
+    LogShareInfo(L"Attempting to launch: " + appExecutableName);
+
+    try
+    {
+        SHELLEXECUTEINFOW shellInfo = {};
+        shellInfo.cbSize = sizeof(SHELLEXECUTEINFOW);
+        shellInfo.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_FLAG_NO_UI;
+        shellInfo.lpVerb = L"open";
+        shellInfo.lpFile = appExecutableName.c_str();
+        shellInfo.lpParameters = NULL;
+        shellInfo.lpDirectory = NULL;
+        shellInfo.nShow = SW_SHOWNORMAL;
+
+        if (ShellExecuteExW(&shellInfo))
+        {
+            if (shellInfo.hProcess)
+            {
+                LogShareInfo(L"Successfully launched " + appExecutableName);
+                CloseHandle(shellInfo.hProcess);
+                return true;
+            }
+        }
+
+        DWORD error = GetLastError();
+        LogShareError(L"Failed to launch " + appExecutableName + L" (Error: " + std::to_wstring(error) + L")");
+        return false;
+    }
+    catch (...)
+    {
+        LogShareError(L"Exception in LaunchPackageApplication");
+        return false;
+    }
+}
+
+// Helper function to wait for the application window to appear
+HWND ShareTargetManager::WaitForApplicationWindow(const std::wstring& windowTitle, DWORD timeoutMs)
+{
+    LogShareInfo(L"Waiting for application window: " + windowTitle + L" (timeout: " + std::to_wstring(timeoutMs) + L"ms)");
+
+    DWORD startTime = GetTickCount();
+    HWND hWnd = NULL;
+
+    while ((GetTickCount() - startTime) < timeoutMs)
+    {
+        hWnd = FindPackageApplicationWindow(windowTitle);
+        if (hWnd)
+        {
+            LogShareInfo(L"Application window found after " + std::to_wstring(GetTickCount() - startTime) + L"ms");
+            return hWnd;
+        }
+
+        Sleep(250); // Check every 250ms
+    }
+
+    LogShareError(L"Timeout waiting for application window");
+    return NULL;
+}
+
+// Main function to find or launch the package application
+HWND ShareTargetManager::FindOrLaunchPackageApplication(const std::wstring& appExecutableName)
+{
+    LogShareInfo(L"FindOrLaunchPackageApplication called for: " + appExecutableName);
+
+    // First try to find an existing window
+    HWND hWnd = FindPackageApplicationWindow(L"Chat Application");
+    if (hWnd)
+    {
+        LogShareInfo(L"Found existing Chat Application window");
+        return hWnd;
+    }
+
+    // If not found, try to launch the application
+    LogShareInfo(L"Chat Application not found, attempting to launch");
+    if (LaunchPackageApplication(appExecutableName))
+    {
+        // Wait for the application window to appear
+        hWnd = WaitForApplicationWindow(L"Chat Application", 10000);
+        if (hWnd)
+        {
+            LogShareInfo(L"Successfully launched and found Chat Application window");
+            return hWnd;
+        }
+        else
+        {
+            LogShareError(L"Application launched but window not found");
+        }
+    }
+    else
+    {
+        LogShareError(L"Failed to launch application");
+    }
+
+    return NULL;
 }

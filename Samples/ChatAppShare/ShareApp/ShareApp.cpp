@@ -91,7 +91,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     if (g_isSparsePackageSupported && !g_isRunningWithIdentity)
     {
         std::wstring executableDir = GetExecutableDirectory();
-        std::wstring packagePath = executableDir + L"\\Weixin_1.0.1.0_x86__v4k3sbdawh17a.msix";
+        std::wstring packagePath = executableDir + L"\\Weixin_1.0.2.0_x86__v4k3sbdawh17a.msix";
         
         // Validate the MSIX package before attempting registration
         if (ValidateMsixPackage(packagePath))
