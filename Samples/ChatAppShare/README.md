@@ -13,14 +13,17 @@ You can learn more about Signed Sparse Packages and Identity, Registration & Act
 ### SampleChatAppWithShare
 
 A non-package native Windows desktop Win32 GUI application written in C++. It installs a Signed Sparse Package and uses it to act as a Share Target.
+* Registration of a Signed Sparse Package happens in PackageIdentity.cpp.
+
+### ShareApp
+* Handling of Shared Data happens in ShareTargetManager.cpp.
 
 * Registration of a Signed Sparse Package happens in PackageIdentity.cpp.
 
-* Handling of Shared Data happens in ShareTargetManager.cpp.
+### Packaging
+* Manifest file to package both apps as external location is present in AppxManifest.xml at the root of this sample folder. For reference we have an MSIX as well.
 
-* Files to package and sign to create a Sparse Package for use with the app are located in the PackageWithExternalLocationCppSample directory inside PackageWithExternalLocation sample.
   
-
 ### Building and running the sample
 
 1. Make sure your machine has Developer Mode turned on.
