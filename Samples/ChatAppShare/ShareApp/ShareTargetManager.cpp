@@ -93,13 +93,6 @@ bool ShareTargetManager::ProcessActivationArgs()
             LogShareInfo(L"? Share Target activation detected!");
             s_alreadyProcessed = true; // Mark as processed
             
-            // Ensure contacts are initialized (critical for share target scenarios)
-            if (contacts.empty())
-            {
-                LogShareInfo(L"Initializing contacts for share target scenario...");
-                InitializeContacts();
-            }
-            
             // Process the share target directly here
             auto shareArgs = activationArgs.as<winrt::Windows::ApplicationModel::Activation::IShareTargetActivatedEventArgs>();
             auto shareOperation = shareArgs.ShareOperation();
@@ -230,6 +223,15 @@ bool ShareTargetManager::ProcessActivationArgs()
                 LogShareInfo(L"Successfully found/launched package application for dialog parenting");
             }
 
+            // Ensure contacts are initialized (critical for share target scenarios)
+            if (contacts.empty())
+            {
+                LogShareInfo(L"Initializing contacts for share target scenario...");
+
+                // [TODO] Get contacts from the main app.
+                InitializeContacts();
+            }
+
             // Log the number of contacts available for debugging
             LogShareInfo(L"Available contacts: " + std::to_wstring(contacts.size()));
 
@@ -275,6 +277,7 @@ bool ShareTargetManager::ProcessActivationArgs()
                         selectedContact.lastMessage = lastMsg.length() > 50 ? lastMsg.substr(0, 47) + L"..." : lastMsg;
                     }
                     
+                    // [TODO] Store path somewhere for main application to pick.
                     // If files were shared, add them to the contact's shared files list
                     if (hasFiles && data.Contains(winrt::Windows::ApplicationModel::DataTransfer::StandardDataFormats::StorageItems()))
                     {
