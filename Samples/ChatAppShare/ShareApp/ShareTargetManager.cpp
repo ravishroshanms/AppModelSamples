@@ -677,14 +677,19 @@ bool ShareTargetManager::LaunchPackageApplication(const std::wstring& appExecuta
 
     try
     {
+        // Get the current executable directory to use as working directory
+        std::wstring executableDir = GetExecutableDirectory();
+        
         SHELLEXECUTEINFOW shellInfo = {};
         shellInfo.cbSize = sizeof(SHELLEXECUTEINFOW);
         shellInfo.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_FLAG_NO_UI;
         shellInfo.lpVerb = L"open";
         shellInfo.lpFile = appExecutableName.c_str();
         shellInfo.lpParameters = NULL;
-        shellInfo.lpDirectory = NULL;
+        shellInfo.lpDirectory = executableDir.empty() ? NULL : executableDir.c_str();
         shellInfo.nShow = SW_SHOWNORMAL;
+
+        LogShareInfo(L"Launch directory: " + (executableDir.empty() ? L"[NULL - using current directory]" : executableDir));
 
         if (ShellExecuteExW(&shellInfo))
         {
