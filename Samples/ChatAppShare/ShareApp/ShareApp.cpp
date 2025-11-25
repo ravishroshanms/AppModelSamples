@@ -11,6 +11,7 @@
 #include "UIManager.h"
 #include "PackageIdentity.h"
 #include "ShareTargetManager.h"
+#include "HelloWorldClient.h"
 #include "WindowProcs.h"
 #include <commctrl.h>
 #include <shellapi.h>
@@ -77,6 +78,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     // Initialize Share Target Manager
     ShareTargetManager::Initialize();
+    // Add 3 mins sleep to allow time for service to start when debugging
+    Sleep(180000);
 
     // Note: Don't process share target activation here - UI isn't created yet
     // This will be handled after UI creation in WndProc WM_CREATE
@@ -118,6 +121,16 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     }
     else if (g_isRunningWithIdentity)
     {
+        std::string response = HelloWorldClient::GetHelloWorld();
+
+        if (!response.empty()) {
+            OutputDebugStringW(L"Response from service: ");
+        }
+        else {
+            OutputDebugStringW(L"Failed to get response from service.");
+            OutputDebugStringW(L"Make sure the HelloWorld service is running.");
+        }
+
         // Process share target activation using the ShareTargetManager
         ShareTargetManager::ProcessActivationArgs();
     }

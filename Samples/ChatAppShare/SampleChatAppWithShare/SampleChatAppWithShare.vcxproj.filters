@@ -51,6 +51,15 @@
     <ClInclude Include="PackageIdentity.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ContactSelectionDialog.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ShareTargetManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="BackgroundService.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SampleChatAppWithShare.cpp">
@@ -77,6 +86,15 @@
     <ClCompile Include="PackageIdentity.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ContactSelectionDialog.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ShareTargetManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="BackgroundService.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="SampleChatAppWithShare.rc">
@@ -93,5 +111,15 @@
   </ItemGroup>
   <ItemGroup>
     <Manifest Include="SampleChatAppWithShare.exe.manifest" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ContactList_ScrollingFix_Complete.md" />
+    <None Include="ContactSelection_PopulationFix_Complete.md" />
+    <None Include="DuplicateContactDialog_Fix_Complete.md" />
+    <None Include="FilePicker_ContactDialog_Removal_Complete.md" />
+    <None Include="ShareOnlyMode_Implementation_Complete.md" />
+    <None Include="ShareTarget_ContactSelection_Complete.md" />
+    <None Include="ShareTarget_MessageFix_Complete.md" />
+    <None Include="BackgroundService_Fix_Complete.md" />
   </ItemGroup>
 </Project>

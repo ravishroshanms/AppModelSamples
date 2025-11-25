@@ -182,6 +182,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="BackgroundService.h" />
     <ClInclude Include="ChatManager.h" />
     <ClInclude Include="ChatModels.h" />
     <ClInclude Include="ContactSelectionDialog.h" />
@@ -198,6 +199,7 @@
     <ClInclude Include="WindowProcs.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="BackgroundService.cpp" />
     <ClCompile Include="ChatManager.cpp" />
     <ClCompile Include="ChatModels.cpp" />
     <ClCompile Include="ContactSelectionDialog.cpp" />
@@ -220,6 +222,7 @@
     <Manifest Include="SampleChatAppWithShare.exe.manifest" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="BackgroundService_Fix_Complete.md" />
     <None Include="ContactList_ScrollingFix_Complete.md" />
     <None Include="ContactSelection_PopulationFix_Complete.md" />
     <None Include="DuplicateContactDialog_Fix_Complete.md" />

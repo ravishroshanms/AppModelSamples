@@ -187,6 +187,7 @@
     <ClInclude Include="ContactSelectionDialog.h" />
     <ClInclude Include="FileManager.h" />
     <ClInclude Include="framework.h" />
+    <ClInclude Include="HelloWorldClient.h" />
     <ClInclude Include="ModernUI.h" />
     <ClInclude Include="PackageIdentity.h" />
     <ClInclude Include="Resource.h" />
@@ -202,6 +203,7 @@
     <ClCompile Include="ChatModels.cpp" />
     <ClCompile Include="ContactSelectionDialog.cpp" />
     <ClCompile Include="FileManager.cpp" />
+    <ClCompile Include="HelloWorldClient.cpp" />
     <ClCompile Include="ModernUI.cpp" />
     <ClCompile Include="PackageIdentity.cpp" />
     <ClCompile Include="ShareApp.cpp" />

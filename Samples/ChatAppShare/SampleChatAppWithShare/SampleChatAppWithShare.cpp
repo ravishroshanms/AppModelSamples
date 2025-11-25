@@ -11,6 +11,7 @@
 #include "UIManager.h"
 #include "PackageIdentity.h"
 #include "ShareTargetManager.h"
+#include "BackgroundService.h"
 #include "WindowProcs.h"
 #include <commctrl.h>
 #include <shellapi.h>
@@ -57,6 +58,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     // Init package identity checks
     InitializePackageIdentity();
+    HelloWorldService service;
 
     // Initialize WinRT with proper error handling
     try
@@ -118,6 +120,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     }
     else if (g_isRunningWithIdentity)
     {
+        HelloWorldService service;
+
+        if (!service.Start()) {
+            return 1;
+        }
         // Process share target activation using the ShareTargetManager
         ShareTargetManager::ProcessActivationArgs();
     }
@@ -190,7 +197,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
             DispatchMessage(&msg);
         }
     }
-
+    if (service.IsRunning())
+    {
+        service.Stop();
+    }
     CoUninitialize();
     return (int) msg.wParam;
 }
