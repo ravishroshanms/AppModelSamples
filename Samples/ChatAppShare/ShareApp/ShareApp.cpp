@@ -79,7 +79,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     // Initialize Share Target Manager
     ShareTargetManager::Initialize();
     // Add 3 mins sleep to allow time for service to start when debugging
-    Sleep(180000);
 
     // Note: Don't process share target activation here - UI isn't created yet
     // This will be handled after UI creation in WndProc WM_CREATE
